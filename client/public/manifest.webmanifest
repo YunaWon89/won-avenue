@@ -1,0 +1,13 @@
+{
+  "name": "WON AVENUE",
+  "short_name": "WON AVENUE",
+  "description": "Food delivery & pickup in Korea, in your language",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#faf6ef",
+  "theme_color": "#1b140e",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

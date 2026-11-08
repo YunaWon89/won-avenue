@@ -1,0 +1,448 @@
+openapi: 3.0.3
+info:
+  title: WON AVENUE API
+  version: 1.0.0
+  description: |
+    REST API for WON AVENUE — food delivery & pickup in Korea (KRW, 7 languages).
+
+    **Auth:** JWT in an httpOnly cookie `token` (set by login/register). For API clients you can also send
+    `Authorization: Bearer <token>` (the token is returned in the login response).
+
+    **Lists** return `{ success, items, page, limit, totalCount, totalPages }`.
+    **Errors** return `{ success: false, message, code?, errors?: [{ field, message }] }`.
+
+    Demo accounts (password `Demo1234!`): admin@demo.com, owner@demo.com, owner2@demo.com, customer@demo.com, courier@demo.com
+
+    **Order flow:** delivery `pending → preparing → out_for_delivery → delivered → completed`,
+    pickup `pending → preparing → ready_for_pickup → completed`. The restaurant accepts (→ preparing) or rejects;
+    only the courier who took the delivery sets `delivered`; the order then
+    completes automatically. Unanswered pending orders are cancelled and refunded automatically.
+servers:
+  - url: /api
+tags:
+  - name: Auth
+  - name: Restaurants
+  - name: Menu
+  - name: Orders
+  - name: Reviews
+  - name: Payments
+  - name: Courier
+  - name: Admin
+  - name: Meta
+components:
+  securitySchemes:
+    cookieAuth: { type: apiKey, in: cookie, name: token }
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+  parameters:
+    Id: { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    Page: { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+    Limit: { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50 } }
+  schemas:
+    Error:
+      type: object
+      properties:
+        success: { type: boolean, example: false }
+        message: { type: string }
+        code: { type: string, example: VALIDATION_ERROR }
+        errors: { type: array, items: { type: object, properties: { field: { type: string }, message: { type: string } } } }
+    Paginated:
+      type: object
+      properties:
+        success: { type: boolean }
+        items: { type: array, items: { type: object } }
+        page: { type: integer }
+        limit: { type: integer }
+        totalCount: { type: integer }
+        totalPages: { type: integer }
+    User:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        email: { type: string }
+        role: { type: string, enum: [customer, manager, admin, courier] }
+        isActive: { type: boolean }
+        preferredLanguage: { type: string, enum: [en, ko, zh, vi, th, ru, ja] }
+        phone: { type: string }
+        postalCode: { type: string }
+        addressLine1: { type: string }
+        addressLine2: { type: string }
+    Restaurant:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: string }
+        cuisineType: { type: string }
+        address: { type: string }
+        phone: { type: string }
+        imageUrl: { type: string }
+        isActive: { type: boolean }
+        supportsDelivery: { type: boolean }
+        supportsPickup: { type: boolean }
+        deliveryFee: { type: integer, description: KRW }
+        minOrderAmount: { type: integer, description: KRW }
+        prepTimeMinutes: { type: integer }
+        opensAt: { type: string, nullable: true, example: '11:00', description: 'Seoul time, HH:MM. Empty / null = open 24 hours' }
+        closesAt: { type: string, nullable: true, example: '21:30', description: 'May be after midnight (e.g. 04:00)' }
+        isOpen: { type: boolean, readOnly: true, description: Open right now (Seoul time). Closed restaurants reject orders with RESTAURANT_CLOSED }
+        averageRating: { type: number }
+        reviewCount: { type: integer }
+        sourceLanguage: { type: string }
+        translations: { type: object, example: { en: { description: '...' } } }
+        managerId: { type: string, format: uuid, nullable: true }
+    MenuItem:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        restaurantId: { type: string, format: uuid }
+        categoryId: { type: string, format: uuid, nullable: true }
+        name: { type: string }
+        description: { type: string }
+        price: { type: integer, description: KRW }
+        imageUrl: { type: string }
+        isAvailable: { type: boolean }
+        allergens: { type: array, items: { type: string }, example: [egg, milk] }
+        dietaryTags: { type: array, items: { type: string }, example: [halal, vegetarian] }
+        spiceLevel: { type: integer, minimum: 0, maximum: 3 }
+        translations: { type: object, example: { en: { name: Kimchi stew, description: '...' } } }
+    Order:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        orderNumber: { type: integer }
+        orderType: { type: string, enum: [delivery, pickup] }
+        status: { type: string, enum: [pending, accepted, preparing, ready_for_pickup, out_for_delivery, delivered, completed, cancelled] }
+        checkoutId: { type: string, format: uuid, nullable: true, description: Same value for orders paid together in one multi-restaurant checkout }
+        deliveryAddress: { type: string, nullable: true }
+        contactPhone: { type: string }
+        itemsAmount: { type: integer }
+        deliveryFee: { type: integer }
+        totalAmount: { type: integer }
+        currency: { type: string, example: KRW }
+        paymentStatus: { type: string, enum: [pending, paid, failed, refunded] }
+        cardLabel: { type: string, example: VISA •••• 4242 }
+        items: { type: array, items: { type: object } }
+        allowedTransitions: { type: array, items: { type: string } }
+  responses:
+    Error: { description: Error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    List: { description: Paginated list, content: { application/json: { schema: { $ref: '#/components/schemas/Paginated' } } } }
+    Ok: { description: OK }
+security:
+  - cookieAuth: []
+  - bearerAuth: []
+paths:
+  /meta:
+    get:
+      tags: [Meta]
+      security: []
+      summary: Allergen / diet / cuisine vocabularies, languages, payment provider
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /auth/register:
+    post:
+      tags: [Auth]
+      security: []
+      summary: Register a customer or restaurant owner
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password, phone]
+              properties:
+                name: { type: string, minLength: 2, maxLength: 50 }
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8, description: Must contain a letter and a number }
+                phone: { type: string, example: 010-1234-5678 }
+                accountType: { type: string, enum: [customer, manager, courier], default: customer }
+                postalCode: { type: string, example: '04066' }
+                addressLine1: { type: string, description: Required for customers }
+                addressLine2: { type: string }
+                preferredLanguage: { type: string, enum: [en, ko, zh, vi, th, ru, ja] }
+      responses: { '201': { description: Created (sets cookie) }, '400': { $ref: '#/components/responses/Error' }, '409': { $ref: '#/components/responses/Error' } }
+  /auth/login:
+    post:
+      tags: [Auth]
+      security: []
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [email, password], properties: { email: { type: string, example: customer@demo.com }, password: { type: string, example: Demo1234! } } } } }
+      responses: { '200': { description: Logged in (sets cookie, returns user + token) }, '401': { $ref: '#/components/responses/Error' } }
+  /auth/logout:
+    post: { tags: [Auth], summary: Clear session cookie, responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /auth/session:
+    get: { tags: [Auth], security: [], summary: Current user or null for guests (no 401), responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /auth/me:
+    get: { tags: [Auth], summary: Current user, responses: { '200': { $ref: '#/components/responses/Ok' }, '401': { $ref: '#/components/responses/Error' } } }
+    patch:
+      tags: [Auth]
+      summary: Update own profile (name, phone, address, language, food passport)
+      description: |
+        Saving a food passport (diet / allergies — health-related data) needs consent once: send `passportConsent: true`,
+        otherwise 400 `PASSPORT_CONSENT_REQUIRED`. Sending `passport: null` deletes it and withdraws the consent.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/User'
+                - type: object
+                  properties:
+                    passport: { type: object, nullable: true, properties: { enabled: { type: boolean }, diet: { type: array, items: { type: string } }, allergens: { type: array, items: { type: string } }, maxSpice: { type: integer } } }
+                    passportConsent: { type: boolean }
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /auth/me/password:
+    post:
+      tags: [Auth]
+      requestBody: { content: { application/json: { schema: { type: object, properties: { currentPassword: { type: string }, newPassword: { type: string } } } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '400': { $ref: '#/components/responses/Error' } }
+  /images/{id}:
+    parameters: [{ $ref: '#/components/parameters/Id' }]
+    get: { tags: [Meta], security: [], summary: Uploaded image (stored in PostgreSQL), responses: { '200': { description: Image bytes }, '404': { $ref: '#/components/responses/Error' } } }
+  /health:
+    get: { tags: [Meta], security: [], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /restaurants:
+    get:
+      tags: [Restaurants]
+      security: []
+      summary: List restaurants (search / filter / sort / paginate)
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+        - { name: search, in: query, schema: { type: string }, description: Name, cuisine or dish name }
+        - { name: cuisine, in: query, schema: { type: string } }
+        - { name: minRating, in: query, schema: { type: number } }
+        - { name: orderType, in: query, schema: { type: string, enum: [delivery, pickup] } }
+        - { name: diet, in: query, schema: { type: string }, description: 'Comma list, e.g. halal,vegetarian' }
+        - { name: isActive, in: query, schema: { type: boolean }, description: Admin only }
+        - { name: managed, in: query, schema: { type: boolean }, description: Owner — only my restaurants }
+        - { name: mood, in: query, schema: { type: string }, description: 'Mood tile, e.g. spicy, sweet, fast' }
+        - { name: pDiet, in: query, schema: { type: string }, description: Food passport diets of the viewer (comma list) }
+        - { name: pAllergens, in: query, schema: { type: string }, description: Food passport allergens of the viewer (comma list) }
+        - { name: pMaxSpice, in: query, schema: { type: integer, minimum: 0, maximum: 3 } }
+        - { name: safeOnly, in: query, schema: { type: boolean }, description: Only restaurants with dishes safe for the passport }
+        - { name: sort, in: query, schema: { type: string, enum: [rating, newest, name, delivery_fee, fast, safe] } }
+      responses: { '200': { $ref: '#/components/responses/List' } }
+    post:
+      tags: [Restaurants]
+      summary: Create restaurant (admin; an owner's restaurant is created inactive until approved)
+      requestBody:
+        content:
+          multipart/form-data: { schema: { allOf: [{ $ref: '#/components/schemas/Restaurant' }, { type: object, properties: { image: { type: string, format: binary } } }] } }
+          application/json: { schema: { $ref: '#/components/schemas/Restaurant' } }
+      responses: { '201': { $ref: '#/components/responses/Ok' }, '400': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' } }
+  /restaurants/cuisines:
+    get: { tags: [Restaurants], security: [], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /restaurants/{id}:
+    parameters: [{ $ref: '#/components/parameters/Id' }]
+    get: { tags: [Restaurants], security: [], summary: Details with categories, responses: { '200': { $ref: '#/components/responses/Ok' }, '404': { $ref: '#/components/responses/Error' } } }
+    patch:
+      tags: [Restaurants]
+      summary: Update (admin, or owner of this restaurant — owner cannot change isActive/managerId)
+      requestBody: { content: { multipart/form-data: { schema: { $ref: '#/components/schemas/Restaurant' } }, application/json: { schema: { $ref: '#/components/schemas/Restaurant' } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '403': { $ref: '#/components/responses/Error' } }
+    delete: { tags: [Restaurants], summary: Delete (or deactivate if it has orders) — admin, responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /restaurants/{id}/menu-items:
+    get:
+      tags: [Menu]
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+        - { name: search, in: query, schema: { type: string } }
+        - { name: categoryId, in: query, schema: { type: string, format: uuid } }
+        - { name: available, in: query, schema: { type: boolean }, description: Owner/admin only }
+        - { name: minPrice, in: query, schema: { type: integer } }
+        - { name: maxPrice, in: query, schema: { type: integer } }
+        - { name: excludeAllergens, in: query, schema: { type: string }, description: 'Hide items containing any, e.g. peanut,milk' }
+        - { name: diet, in: query, schema: { type: string }, description: 'Item must have all tags, e.g. halal,vegan' }
+        - { name: maxSpice, in: query, schema: { type: integer, minimum: 0, maximum: 3 } }
+        - { name: sort, in: query, schema: { type: string, enum: [price_asc, price_desc, newest, name] } }
+      responses: { '200': { $ref: '#/components/responses/List' } }
+  /restaurants/{id}/reviews:
+    get:
+      tags: [Reviews]
+      security: []
+      parameters: [{ $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/Limit' }]
+      responses: { '200': { $ref: '#/components/responses/List' } }
+  /categories:
+    post:
+      tags: [Menu]
+      requestBody: { content: { application/json: { schema: { type: object, required: [restaurantId, name], properties: { restaurantId: { type: string, format: uuid }, name: { type: string }, sortOrder: { type: integer } } } } } }
+      responses: { '201': { $ref: '#/components/responses/Ok' }, '403': { $ref: '#/components/responses/Error' } }
+  /categories/{id}:
+    parameters: [{ $ref: '#/components/parameters/Id' }]
+    patch: { tags: [Menu], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+    delete: { tags: [Menu], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /menu-items:
+    post:
+      tags: [Menu]
+      summary: Create menu item (owner of the restaurant / admin). multipart with optional `image`.
+      requestBody:
+        content:
+          multipart/form-data: { schema: { allOf: [{ $ref: '#/components/schemas/MenuItem' }, { type: object, properties: { image: { type: string, format: binary } } }] } }
+          application/json: { schema: { $ref: '#/components/schemas/MenuItem' } }
+      responses: { '201': { $ref: '#/components/responses/Ok' }, '400': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' } }
+  /menu-items/{id}:
+    parameters: [{ $ref: '#/components/parameters/Id' }]
+    get: { tags: [Menu], security: [], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+    patch: { tags: [Menu], requestBody: { content: { multipart/form-data: { schema: { $ref: '#/components/schemas/MenuItem' } } } }, responses: { '200': { $ref: '#/components/responses/Ok' } } }
+    delete: { tags: [Menu], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /orders:
+    post:
+      tags: [Orders]
+      summary: Create and pay for an order (customer). Totals are calculated on the server.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [restaurantId, items, paymentMethodId]
+              properties:
+                restaurantId: { type: string, format: uuid }
+                orderType: { type: string, enum: [delivery, pickup] }
+                items: { type: array, items: { type: object, properties: { menuItemId: { type: string, format: uuid }, quantity: { type: integer, minimum: 1 } } } }
+                deliveryAddress: { type: string, description: Required for delivery }
+                contactPhone: { type: string }
+                customerNote: { type: string }
+                paymentMethodId: { type: string, format: uuid }
+      responses: { '201': { $ref: '#/components/responses/Ok' }, '400': { $ref: '#/components/responses/Error' }, '402': { description: Payment declined } }
+    get:
+      tags: [Orders]
+      summary: Orders visible to the user (own / restaurant's / all)
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+        - { name: status, in: query, schema: { type: string } }
+        - { name: scope, in: query, schema: { type: string, enum: [available, mine] }, description: 'Courier: deliveries waiting for a courier / my deliveries' }
+        - { name: active, in: query, schema: { type: boolean } }
+        - { name: orderType, in: query, schema: { type: string, enum: [delivery, pickup] } }
+        - { name: from, in: query, schema: { type: string, format: date } }
+        - { name: to, in: query, schema: { type: string, format: date } }
+        - { name: customerId, in: query, schema: { type: string, format: uuid } }
+        - { name: restaurantId, in: query, schema: { type: string, format: uuid } }
+        - { name: sort, in: query, schema: { type: string, enum: [newest, oldest, status] } }
+      responses: { '200': { $ref: '#/components/responses/List' } }
+  /orders/batch:
+    post:
+      tags: [Orders]
+      summary: One checkout for a cart with several restaurants (customer)
+      description: |
+        Creates one order per restaurant (each has its own delivery fee, courier and status) with shared address,
+        phone, note and card. All parts are validated together: if any is invalid nothing is created and the error
+        carries `restaurantId`. Each order is charged separately; if a payment fails, orders already paid in this
+        checkout are refunded and all are cancelled. Up to 5 restaurants.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [orders, paymentMethodId]
+              properties:
+                orderType: { type: string, enum: [delivery, pickup] }
+                orders:
+                  type: array
+                  minItems: 1
+                  maxItems: 5
+                  items: { type: object, properties: { restaurantId: { type: string, format: uuid }, items: { type: array, items: { type: object, properties: { menuItemId: { type: string, format: uuid }, quantity: { type: integer, minimum: 1 } } } } } }
+                deliveryAddress: { type: string, description: Required for delivery }
+                contactPhone: { type: string }
+                customerNote: { type: string }
+                paymentMethodId: { type: string, format: uuid }
+      responses: { '201': { description: Array of created orders }, '400': { $ref: '#/components/responses/Error' }, '402': { description: Payment declined — nothing is kept } }
+  /orders/{id}:
+    parameters: [{ $ref: '#/components/parameters/Id' }]
+    get: { tags: [Orders], responses: { '200': { $ref: '#/components/responses/Ok' }, '404': { $ref: '#/components/responses/Error' } } }
+  /orders/{id}/status:
+    parameters: [{ $ref: '#/components/parameters/Id' }]
+    patch:
+      tags: [Orders]
+      summary: Change status following the allowed flow (cancelling a paid order refunds it)
+      description: |
+        Owner — `pending → preparing` (accept) or `cancelled` (reject), then `out_for_delivery` / `ready_for_pickup` (and `completed` when a pickup order is handed over).
+        Courier — `out_for_delivery → delivered` (own deliveries only). Customer — cancel while `pending` (no receipt
+        confirmation: delivered orders complete automatically). Admin — cancel an active order.
+      requestBody: { content: { application/json: { schema: { type: object, properties: { status: { type: string, enum: [preparing, ready_for_pickup, out_for_delivery, delivered, completed, cancelled] } } } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '400': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' } }
+  /orders/{id}/claim:
+    parameters: [{ $ref: '#/components/parameters/Id' }]
+    post:
+      tags: [Courier]
+      summary: Courier takes a delivery that is out for delivery and has no courier yet
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '409': { description: DELIVERY_TAKEN — another courier already took it } }
+  /reviews:
+    post:
+      tags: [Reviews]
+      summary: Review a completed order (once per order), optionally with up to 3 photos
+      description: Send JSON, or multipart/form-data with the same fields plus up to 3 `photos` (JPEG / PNG / WEBP, ≤ 2 MB each). The comment is translated into every language (source detected from the text).
+      requestBody:
+        content:
+          application/json: { schema: { type: object, properties: { orderId: { type: string, format: uuid }, rating: { type: integer, minimum: 1, maximum: 5 }, comment: { type: string } } } }
+          multipart/form-data: { schema: { type: object, properties: { orderId: { type: string, format: uuid }, rating: { type: integer }, comment: { type: string }, photos: { type: array, maxItems: 3, items: { type: string, format: binary } } } } }
+      responses: { '201': { $ref: '#/components/responses/Ok' }, '400': { $ref: '#/components/responses/Error' }, '409': { $ref: '#/components/responses/Error' } }
+    get: { tags: [Reviews], summary: All reviews — admin, responses: { '200': { $ref: '#/components/responses/List' } } }
+  /reviews/{id}:
+    parameters: [{ $ref: '#/components/parameters/Id' }]
+    patch:
+      tags: [Reviews]
+      summary: Approve / hide review — admin
+      requestBody: { content: { application/json: { schema: { type: object, properties: { isApproved: { type: boolean } } } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /payment-methods:
+    get: { tags: [Payments], summary: My saved cards, responses: { '200': { $ref: '#/components/responses/Ok' } } }
+    post:
+      tags: [Payments]
+      summary: Save a card. Demo mode — card fields (number discarded after validation). Toss mode — authKey + customerKey.
+      requestBody: { content: { application/json: { schema: { type: object, properties: { cardNumber: { type: string, example: '4242 4242 4242 4242' }, expMonth: { type: integer }, expYear: { type: integer }, cvc: { type: string }, isForeign: { type: boolean }, authKey: { type: string }, customerKey: { type: string } } } } } }
+      responses: { '201': { $ref: '#/components/responses/Ok' }, '400': { $ref: '#/components/responses/Error' } }
+  /payment-methods/config:
+    get: { tags: [Payments], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /payment-methods/{id}/default:
+    parameters: [{ $ref: '#/components/parameters/Id' }]
+    patch: { tags: [Payments], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /payment-methods/{id}:
+    parameters: [{ $ref: '#/components/parameters/Id' }]
+    delete: { tags: [Payments], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /admin/dishes:
+    get:
+      tags: [Admin]
+      summary: Dishes to check after publication
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+        - { name: status, in: query, schema: { type: string, enum: [new, needs_changes, removed, ok, all], default: new } }
+        - { name: search, in: query, schema: { type: string }, description: Dish or restaurant name }
+      responses: { '200': { $ref: '#/components/responses/List' } }
+  /admin/dishes/{id}/review:
+    parameters: [{ $ref: '#/components/parameters/Id' }]
+    patch:
+      tags: [Admin]
+      summary: Mark a dish OK, or ask the owner for changes (dish is hidden if not fixed in DISH_FIX_DAYS)
+      requestBody: { content: { application/json: { schema: { type: object, required: [action], properties: { action: { type: string, enum: [approve, request_changes] }, note: { type: string, minLength: 5, maxLength: 1000, description: Required for request_changes } } } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '400': { $ref: '#/components/responses/Error' } }
+  /manage/flagged-dishes:
+    get: { tags: [Menu], summary: Owner — dishes the admin asked to fix, responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /admin/demo/reset:
+    post: { tags: [Admin], summary: Restore demo data (only when DEMO_MODE=true), responses: { '200': { $ref: '#/components/responses/Ok' }, '403': { $ref: '#/components/responses/Error' } } }
+  /admin/stats:
+    get: { tags: [Admin], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /admin/users:
+    get:
+      tags: [Admin]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+        - { name: search, in: query, schema: { type: string } }
+        - { name: role, in: query, schema: { type: string, enum: [customer, manager, admin] } }
+        - { name: isActive, in: query, schema: { type: boolean } }
+      responses: { '200': { $ref: '#/components/responses/List' }, '403': { $ref: '#/components/responses/Error' } }
+    post: { tags: [Admin], summary: Create user with any role, responses: { '201': { $ref: '#/components/responses/Ok' } } }
+  /admin/users/{id}:
+    parameters: [{ $ref: '#/components/parameters/Id' }]
+    get: { tags: [Admin], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+    patch:
+      tags: [Admin]
+      requestBody: { content: { application/json: { schema: { type: object, properties: { role: { type: string }, isActive: { type: boolean }, name: { type: string } } } } } }
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
