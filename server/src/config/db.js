@@ -8,8 +8,15 @@ types.setTypeParser(20, (v) => (v === null ? null : parseInt(v, 10)));
 const pool = new Pool({
   connectionString: env.databaseUrl,
   ssl: env.databaseSsl ? { rejectUnauthorized: false } : undefined,
-  max: 10,
+  // Serverless: many small instances share the database, so each keeps few connections.
+  max: env.serverless ? 3 : 10,
+  idleTimeoutMillis: env.serverless ? 5000 : 10000,
 });
+
+// On Vercel, close idle connections before an instance is suspended.
+if (env.serverless) {
+  try { require('@vercel/functions').attachDatabasePool(pool); } catch { /* not on Vercel runtime */ }
+}
 
 const query = (text, params) => pool.query(text, params);
 

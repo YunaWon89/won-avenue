@@ -5,6 +5,7 @@ const { WhereBuilder, runPaginated } = require('../utils/pagination');
 const restaurantService = require('./restaurantService');
 const { translateReview, isEnabled: isTranslationEnabled } = require('./translationService');
 const { saveImage, looksLikeImage, MAX_REVIEW_PHOTOS } = require('../middleware/upload');
+const { runInBackground } = require('../utils/background');
 
 /** Average rating is calculated only from approved reviews. */
 async function recalculateRating(restaurantId, client = db) {
@@ -52,12 +53,13 @@ async function create(customer, { orderId, rating, comment }, photos = []) {
   if (review.comment && isTranslationEnabled()) {
     await db.query("UPDATE reviews SET translation_status = 'pending' WHERE id = $1", [review.id]);
     review.translation_status = 'pending';
-    translateReview(review.comment, review.source_language)
-      .then((tr) => tr.status === 'done' && db.query(
-        'UPDATE reviews SET source_language = $2, translations = $3, translation_status = $4 WHERE id = $1',
-        [review.id, tr.sourceLanguage, tr.translations, 'done'],
-      ))
-      .catch((e) => console.warn('[translate] review save failed:', e.message));
+    runInBackground(async () => {
+      const tr = await translateReview(review.comment, review.source_language);
+      if (tr.status === 'done') {
+        await db.query('UPDATE reviews SET source_language = $2, translations = $3, translation_status = $4 WHERE id = $1',
+          [review.id, tr.sourceLanguage, tr.translations, 'done']);
+      }
+    }, 'translate');
   }
   return toCamel(review);
 }

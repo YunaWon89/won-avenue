@@ -921,3 +921,57 @@ describe('Review photos', () => {
     expect((await agent.post('/api/reviews').send({ orderId: order.id, rating: 4 })).status).toBe(201);
   });
 });
+
+// ---------------------------------------------------------------------------
+describe('Serverless mode (Vercel): jobs on requests, database bootstrap', () => {
+  const { runDueJobs, JOBS } = require('../src/jobs');
+  const deliveredLongAgo = async () => {
+    const { rows } = await pool.query(
+      `UPDATE orders SET status = 'delivered', updated_at = NOW() - INTERVAL '20 minutes'
+       WHERE id = (SELECT id FROM orders WHERE status = 'out_for_delivery' AND order_type = 'delivery' LIMIT 1) RETURNING id`,
+    );
+    return rows[0].id;
+  };
+  const statusOf = async (id) => (await pool.query('SELECT status FROM orders WHERE id = $1', [id])).rows[0].status;
+
+  test('due jobs run on a request; the same job is not repeated within its interval', async () => {
+    const t0 = Date.now() + 10 * 60 * 1000; // later than anything run before in this file
+    const first = await deliveredLongAgo();
+    await runDueJobs(t0);
+    expect(await statusOf(first)).toBe('completed'); // delivered 20 min ago -> completed automatically
+
+    await seed(); // fresh orders
+    const second = await deliveredLongAgo();
+    await runDueJobs(t0 + 1000); // 1 s later: orders job is not due yet
+    expect(await statusOf(second)).toBe('delivered');
+    await runDueJobs(t0 + JOBS.find((j) => j.name === 'orders').everyMs + 1000);
+    expect(await statusOf(second)).toBe('completed');
+  });
+
+  test('a job is skipped while another instance holds its lock', async () => {
+    const id = await deliveredLongAgo();
+    const other = await pool.connect(); // pretend another server instance is running the orders job
+    const lock = JOBS.find((j) => j.name === 'orders').lock;
+    try {
+      await other.query('SELECT pg_advisory_lock($1)', [lock]);
+      await runDueJobs(Date.now() + 60 * 60 * 1000);
+      expect(await statusOf(id)).toBe('delivered');
+    } finally {
+      await other.query('SELECT pg_advisory_unlock($1)', [lock]);
+      other.release();
+    }
+    await runDueJobs(Date.now() + 2 * 60 * 60 * 1000);
+    expect(await statusOf(id)).toBe('completed');
+  });
+
+  test('bootstrap stores the schema version and keeps existing data', async () => {
+    const usersBefore = (await pool.query('SELECT COUNT(*)::int AS c FROM users')).rows[0].c;
+    await pool.query("DELETE FROM app_meta WHERE key = 'schema_hash'").catch(() => {});
+    await jest.isolateModulesAsync(async () => {
+      await require('../src/bootstrap').ensureReady({ log: () => {} });
+    });
+    const meta = await pool.query("SELECT value FROM app_meta WHERE key = 'schema_hash'");
+    expect(meta.rows[0].value).toMatch(/^[0-9a-f]{64}$/);
+    expect((await pool.query('SELECT COUNT(*)::int AS c FROM users')).rows[0].c).toBe(usersBefore);
+  });
+});

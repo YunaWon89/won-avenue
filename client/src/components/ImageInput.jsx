@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { imageUrl } from '../api/client';
 import { Field } from './ui';
+import { compressImage } from '../utils/compressImage';
 
 const MAX = 2 * 1024 * 1024;
 const TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -19,11 +20,12 @@ export function ImageInput({ label, current, file, onChange }) {
     return () => URL.revokeObjectURL(url);
   }, [file]);
 
-  const pick = (e) => {
-    const f = e.target.files?.[0];
+  const pick = async (e) => {
+    const picked = e.target.files?.[0];
     e.target.value = '';
-    if (!f) return;
-    if (!TYPES.includes(f.type)) { setError(t('errors.INVALID_FILE_TYPE')); return; }
+    if (!picked) return;
+    if (!TYPES.includes(picked.type)) { setError(t('errors.INVALID_FILE_TYPE')); return; }
+    const f = await compressImage(picked); // big phone photos become small enough to upload
     if (f.size > MAX) { setError(t('errors.FILE_TOO_LARGE')); return; }
     setError(undefined);
     onChange(f);

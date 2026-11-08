@@ -122,16 +122,44 @@ npm test
 
 ## 배포 (공개 링크)
 
-서버가 빌드된 React 앱도 함께 제공하므로, 전체 프로젝트는 **웹 서비스 1개 + 데이터베이스 1개**로 하나의 주소에서 동작합니다(같은 도메인 쿠키, CORS 설정 불필요).
+### Vercel + Neon (추천, 무료, 대시보드 하나)
 
-### Render (무료)
+React 앱은 Vercel CDN에서 정적 파일로 제공되고, Express API는 Vercel 함수 하나(`api/index.js`, 데이터베이스와 같은 싱가포르 `sin1` 리전)로 동작합니다.
+데이터베이스는 Vercel 대시보드에서 만드는 Neon PostgreSQL입니다. 무료 플랜은 만료되지 않고, Render 무료 플랜처럼 1분 가까이 "잠들지" 않아요.
 
 1. 이 저장소를 GitHub에 올립니다.
-2. Render → **New → Blueprint** → 저장소 선택. `render.yaml`이 웹 서비스와 PostgreSQL을 만듭니다.
-3. 첫 배포를 기다립니다. 데모 데이터는 자동으로 추가됩니다(`SEED_ON_EMPTY=true`). `https://<서비스>.onrender.com`을 엽니다.
-4. 선택: 서비스의 Environment 설정에 `GEMINI_API_KEY`를 추가하면 새 메뉴와 리뷰가 자동 번역됩니다.
+2. [vercel.com](https://vercel.com) → GitHub로 로그인 → **Add New → Project** → 저장소 가져오기.
+   설정은 그대로 두세요. `vercel.json`에 설치·빌드 명령, 출력 폴더, API 함수가 이미 들어 있어요.
+3. 첫 배포 전에 **Environment Variables**에 추가합니다:
 
-무료 플랜 참고: 15분 정도 접속이 없으면 서비스가 잠들고(첫 요청에 30~60초), Render 무료 PostgreSQL은 30일 후 만료됩니다. 오래 쓸 무료 데이터베이스가 필요하면 [Neon](https://neon.tech)에서 만들고 `DATABASE_URL`에 연결 문자열을 넣으세요.
+   | 이름 | 값 |
+   |---|---|
+   | `JWT_SECRET` | 길고 무작위한 문자열(비밀번호 생성기 등으로 40자 이상) |
+   | `SEED_ON_EMPTY` | `true` (첫 요청 때 빈 데이터베이스에 데모 데이터 추가) |
+   | `DEMO_MODE` | `true` (관리자 "데모 데이터 초기화" 버튼) |
+   | `GEMINI_API_KEY` | 선택 — 새 메뉴와 리뷰 자동 번역 |
+
+4. **Deploy**를 누릅니다. 5단계 전에는 데이터베이스가 없어서 사이트가 데이터베이스 오류를 보여 주는데, 정상이에요.
+5. 프로젝트 → **Storage → Create Database → Neon**(Postgres), 리전 **Singapore**, 프로젝트에 연결(모든 환경). `DATABASE_URL`이 자동으로 추가됩니다.
+6. **Deployments → ⋯ → Redeploy**. `https://<프로젝트>.vercel.app`을 열면 첫 요청에서 테이블과 데모 데이터가 만들어집니다(몇 초).
+
+서버리스 버전의 동작 방식(`server/src/bootstrap.js`, `server/src/jobs.js`):
+- `schema.sql`이 바뀌었을 때만 스키마를 적용하고(해시는 `app_meta`에 저장), 데모 데이터는 빈 데이터베이스에만 넣습니다.
+  PostgreSQL advisory lock 덕분에 인스턴스 여러 개가 동시에 시작해도 안전해요.
+- 요청 사이에 실행 중인 프로세스가 없으므로, 주기 작업(주문 자동 완료·자동 취소, 번역 재시도, 수정하지 않은 메뉴 숨기기)은 들어오는 요청 때 시간이 되면 실행되고, 작업마다 advisory lock을 씁니다.
+- 새 리뷰는 응답 후 `waitUntil`로 번역되므로 손님은 번역을 기다리지 않아요.
+- 사진은 업로드 전에 브라우저에서 줄여서(최대 1600 px) Vercel 요청 한도 4.5 MB 안에 들어갑니다.
+- 설정이 잘못되면 무엇을 고쳐야 하는지 JSON 메시지로 알려 줍니다(`JWT_SECRET` 없음, 데이터베이스 연결 불가).
+
+### Render (대안)
+
+같은 코드가 일반 상시 실행 서버로도 동작합니다.
+
+1. Render → **New → Blueprint** → 저장소 선택. `render.yaml`이 웹 서비스와 PostgreSQL을 만듭니다.
+2. 첫 배포를 기다린 뒤(데모 데이터 자동 추가) `https://<서비스>.onrender.com`을 엽니다.
+
+무료 플랜 참고: 15분 정도 접속이 없으면 서비스가 잠들고(첫 요청에 30~60초), Render 무료 PostgreSQL은 30일 후 만료됩니다
+(데이터를 유지하려면 `DATABASE_URL`로 [Neon](https://neon.tech) 데이터베이스를 쓰세요).
 
 ### Docker 호스트
 
@@ -230,7 +258,10 @@ docker run -p 5000:5000 -e DATABASE_URL=... -e JWT_SECRET=... -e SEED_ON_EMPTY=t
 ## 프로젝트 구조
 
 ```
+api/index.js    Vercel 함수 (Express 앱을 감쌈, vercel.json 참고)
 server/src
+  bootstrap.js  첫 시작 때 스키마 + 데모 데이터 (advisory lock)
+  jobs.js       주기 작업: 서버에서는 타이머, Vercel에서는 요청 때 실행
   config/       환경 변수, DB 풀, 목록(알레르기, 식단, 음식 종류)
   db/           schema.sql, migrate, seed
   middleware/   인증(JWT + 역할), 검증(Zod), 업로드(multer → DB), 오류 처리

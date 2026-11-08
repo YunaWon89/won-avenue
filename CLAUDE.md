@@ -32,6 +32,15 @@ Read the relevant PRD section before adding or changing a feature.
 - Schema: `db/schema.sql` (idempotent, `ALTER ... IF NOT EXISTS` for new columns). Demo data: `db/seed.js`, `db/demoData.js`.
 - Images are stored in the `images` table and served from `/api/images/:id` (not on disk — free hosts wipe disks).
 
+## Hosting: Vercel (serverless) and long-running server
+- Production runs on **Vercel**: `vercel.json` + `api/index.js` (one function wrapping the Express app, region `sin1`); database Neon.
+- `server/src/server.js` is the long-running entry (local, Docker, Render). Both use:
+  - `server/src/bootstrap.js` — schema (when `schema.sql` changed) + demo data on an empty DB, under an advisory lock;
+  - `server/src/jobs.js` — periodic jobs: timers on a server, run-on-request on Vercel (each job under its own advisory lock).
+- Never rely on in-memory state or timers surviving between requests. Work after the response → `runInBackground()`
+  (`server/src/utils/background.js`, uses Vercel `waitUntil`). Request bodies must stay under 4.5 MB (photos are compressed in the browser).
+- New periodic work → add it to `JOBS` in `jobs.js`, not a `setInterval`.
+
 ## Client layout
 `pages/` (one file per screen; `admin/`, `manage/`), `components/` (shared UI; `ui.jsx` has inputs, badges, dialogs),
 `context/` (auth, cart, meta, passport, toast), `api/client.js` (single API client, cookies, 401/403 handling),

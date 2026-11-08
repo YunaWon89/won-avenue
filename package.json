@@ -14,5 +14,5 @@
     "build": "npm ci --prefix server --omit=dev && npm ci --prefix client --include=dev && npm run build --prefix client",
     "start": "npm start --prefix server"
   },
-  "engines": { "node": ">=20" }
+  "engines": { "node": "22.x" }
 }

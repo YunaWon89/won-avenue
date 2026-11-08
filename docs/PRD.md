@@ -83,11 +83,10 @@ pickup:   pending → preparing → ready_for_pickup → completed
 | any active → cancelled | Admin (exceptional cases) |
 Completed and cancelled orders never change again; no backward moves.
 
-⚠️ Differences from the original assignment (waiting for the mentor's decision):
+⚠️ Differences from the original assignment — **accepted by the mentor** ("the requirements don't have to be followed 100%"):
 1. No separate `accepted` step — "Accept" goes straight to `preparing` (one tap less for restaurants). `accepted` stays in the enum.
 2. `delivered` is set by the courier, not the manager; `completed` is automatic, not set by manager/admin.
-Option if required: restore `pending → accepted → preparing`, let the manager mark `delivered` when no courier is assigned,
-and let manager/admin complete delivered orders manually (update tests + OpenAPI).
+Decision: keep the current flow.
 
 ## 6. Data model (main tables)
 users · restaurants · menu_categories · menu_items · orders · order_items (name/price snapshots) · reviews (unique order_id)
@@ -109,6 +108,10 @@ Client: field errors under inputs, toasts for general errors, redirect to login 
 - Client: texts in all 7 languages, loading / empty / error states, works at ~375 px and in light + dark themes.
 - `npm test`, `npm run check:i18n`, client lint and build pass. README updated if setup or behaviour changed.
 
-## 10. Open items
-- ⏳ Deployment: Render (web) + Neon (PostgreSQL, no 30-day expiry) proposed; waiting for the mentor.
-- ⏳ Status flow differences (section 5): keep or align with the assignment — waiting for the mentor.
+## 10. Deployment and decisions
+- ✅ Hosting: **Vercel + Neon** (free, one dashboard, no 30-day database expiry, no cold "sleep").
+  Static React app on Vercel's CDN; the Express API as one Vercel Function (`api/index.js`, region `sin1`, next to the Neon database in Singapore).
+  Serverless specifics: database bootstrap on the first request (`server/src/bootstrap.js`), periodic jobs run on requests
+  (`server/src/jobs.js`), background work via `waitUntil`, photos compressed in the browser (Vercel request limit 4.5 MB).
+  Render (`render.yaml`) stays as an alternative long-running setup.
+- ✅ Status flow differences (section 5): accepted by the mentor, kept as is.

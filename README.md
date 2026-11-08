@@ -122,16 +122,47 @@ To check the translation key without starting the app: `npm run check:translatio
 
 ## Deploy (public link)
 
-The server also serves the built React app, so the whole project is **one web service + one database**, on a single URL (same-origin cookies, no CORS setup).
+### Vercel + Neon (recommended, free, one dashboard)
 
-### Render (free)
+The React app is served as static files from Vercel's CDN; the Express API runs as one Vercel Function
+(`api/index.js`, region Singapore `sin1`, next to the database). The database is Neon PostgreSQL, created from the Vercel dashboard.
+Free plans don't expire and don't "sleep" for a minute like Render's free tier.
 
 1. Push this repository to GitHub.
-2. Render → **New → Blueprint** → pick the repo. `render.yaml` creates the web service and PostgreSQL.
-3. Wait for the first deploy. Demo data is added automatically (`SEED_ON_EMPTY=true`). Open `https://<service>.onrender.com`.
-4. Optional: add `GEMINI_API_KEY` in the service's Environment settings to translate new dishes and reviews automatically.
+2. [vercel.com](https://vercel.com) → sign in with GitHub → **Add New → Project** → import the repo.
+   Keep the defaults — `vercel.json` already sets install / build commands, the output folder and the API function.
+3. Before the first deploy, open **Environment Variables** and add:
 
-Free-plan notes: the service sleeps after ~15 minutes idle (first request takes ~30–60 s), and Render's free PostgreSQL expires after 30 days. For a long-lived free database, create one on [Neon](https://neon.tech) and set `DATABASE_URL` to its connection string.
+   | Name | Value |
+   |---|---|
+   | `JWT_SECRET` | a long random string (e.g. from a password generator, 40+ characters) |
+   | `SEED_ON_EMPTY` | `true` (fills the empty database with demo data on the first request) |
+   | `DEMO_MODE` | `true` (admin "Reset demo data" button) |
+   | `GEMINI_API_KEY` | optional — automatic translation of new dishes and reviews |
+
+4. Click **Deploy**. Until step 5 the site shows a "Database is not available" message — that's expected.
+5. Project → **Storage → Create Database → Neon** (Postgres), region **Singapore**, connect it to the project
+   (all environments). Vercel adds `DATABASE_URL` automatically.
+6. **Deployments → ⋯ → Redeploy**. Open `https://<project>.vercel.app` — the first request creates the tables and demo data (a few seconds).
+
+How the serverless version works (`server/src/bootstrap.js`, `server/src/jobs.js`):
+- Schema is applied when `schema.sql` changes (hash stored in `app_meta`); demo data only into an empty database.
+  A PostgreSQL advisory lock makes this safe when several instances start at once.
+- There is no process between requests, so periodic jobs (auto-complete / auto-cancel orders, translation retries,
+  hiding unfixed dishes) run on incoming requests when due, each under its own advisory lock.
+- A new review is translated after the response via `waitUntil`, so the customer never waits for the translation.
+- Photos are shrunk in the browser before upload (≤ 1600 px), which keeps requests under Vercel's 4.5 MB limit.
+- Misconfiguration is reported clearly: a missing `JWT_SECRET` or an unreachable database returns a JSON message that says what to fix.
+
+### Render (alternative)
+
+The same code also runs as a classic long-running server.
+
+1. Render → **New → Blueprint** → pick the repo. `render.yaml` creates the web service and PostgreSQL.
+2. Wait for the first deploy (demo data is added automatically) and open `https://<service>.onrender.com`.
+
+Free-plan notes: the service sleeps after ~15 minutes idle (first request takes ~30–60 s), and Render's free PostgreSQL expires after 30 days
+(use a [Neon](https://neon.tech) database via `DATABASE_URL` to keep data).
 
 ### Any Docker host
 
@@ -230,7 +261,10 @@ Run `npm run db:reset`, then check in the browser (desktop and phone width). All
 ## Project structure
 
 ```
+api/index.js    Vercel function (wraps the Express app; see vercel.json)
 server/src
+  bootstrap.js  schema + demo data on first start (advisory lock)
+  jobs.js       periodic jobs: timers on a server, run-on-request on Vercel
   config/       env, db pool, vocabularies (allergens, diets, cuisines)
   db/           schema.sql, migrate, seed
   middleware/   auth (JWT + roles), validate (Zod), upload (multer → DB), error handler

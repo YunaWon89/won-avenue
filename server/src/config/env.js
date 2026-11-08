@@ -5,7 +5,11 @@ require('dotenv').config({ path: path.join(__dirname, '../../.env'), quiet: true
 const env = {
   nodeEnv: process.env.NODE_ENV || 'development',
   port: Number(process.env.PORT) || 5000,
-  databaseUrl: process.env.DATABASE_URL || 'postgres://postgres:postgres@localhost:5432/food_delivery',
+  // DATABASE_URL (Render, local) or POSTGRES_URL (Vercel + Neon integration).
+  databaseUrl: process.env.DATABASE_URL || process.env.POSTGRES_URL || 'postgres://postgres:postgres@localhost:5432/food_delivery',
+  hasDatabaseUrl: Boolean(process.env.DATABASE_URL || process.env.POSTGRES_URL),
+  // Serverless hosting (Vercel): no long-running process, so timers are replaced by jobs run on requests.
+  serverless: Boolean(process.env.VERCEL),
   databaseSsl: process.env.DATABASE_SSL === 'true',
   jwtSecret: process.env.JWT_SECRET || 'dev-secret-change-me',
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',

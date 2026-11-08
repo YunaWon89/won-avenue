@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
+import { compressImages } from '../utils/compressImage';
 
 export const MAX_REVIEW_PHOTOS = 3;
 const MAX_BYTES = 2 * 1024 * 1024;
@@ -49,10 +50,11 @@ export function ReviewPhotoPicker({ files, onChange }) {
     return () => urls.forEach((u) => URL.revokeObjectURL(u));
   }, [files]);
 
-  const pick = (e) => {
-    const chosen = [...e.target.files];
+  const pick = async (e) => {
+    const picked = [...e.target.files];
     e.target.value = '';
-    const bad = chosen.find((f) => !TYPES.includes(f.type));
+    const bad = picked.find((f) => !TYPES.includes(f.type));
+    const chosen = await compressImages(picked.filter((f) => TYPES.includes(f.type))); // phone photos -> a few hundred KB
     const big = chosen.find((f) => f.size > MAX_BYTES);
     if (bad) setError(t('errors.INVALID_FILE_TYPE'));
     else if (big) setError(t('errors.FILE_TOO_LARGE'));
