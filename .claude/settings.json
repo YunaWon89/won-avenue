@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm test)",
+      "Bash(npm run test:*)",
+      "Bash(npm run check:i18n)",
+      "Bash(npm run check:translation)",
+      "Bash(npm run lint:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm run dev:*)",
+      "Bash(npm run db:reset)",
+      "Bash(git status)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)"
+    ],
+    "ask": [
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(npm install:*)"
+    ],
+    "deny": [
+      "Read(./server/.env)",
+      "Edit(./server/.env)",
+      "Read(./**/.env)",
+      "Edit(./**/.env)"
+    ]
+  }
+}

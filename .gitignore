@@ -7,3 +7,6 @@ server/uploads/
 *.log
 .DS_Store
 coverage/
+
+# Personal Claude Code settings (not shared)
+.claude/settings.local.json

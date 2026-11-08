@@ -81,6 +81,14 @@ Docker 없이 실행할 때는 데이터베이스 `food_delivery`(앱)와 `food_
 
 데모 사진은 데모용으로 AI가 생성한 이미지예요(`server/src/db/demo-images`). 실제 메뉴와 맞는 경우에만 붙였어요(채식 메뉴에 고기 사진 없음). 실제 가게는 직접 사진을 올려요.
 
+## AI 코딩 에이전트와 함께 작업하기
+
+- `CLAUDE.md` — Claude Code가 세션마다 먼저 읽는 프로젝트 안내(스택, 명령어, 규칙).
+- `docs/PRD.md` — 상태 표시가 있는 제품 요구사항(완료 / 과제와 다르게 구현 / 남은 작업).
+- `.claude/skills/` — 단계별 작업 안내: `add-api-endpoint`, `add-ui-text`(7개 언어), `run-checks`.
+- `.claude/settings.json` — 테스트·린트·빌드는 묻지 않고 실행, 커밋·푸시는 먼저 확인, `.env` 파일은 읽지 않음.
+- `npm run check:i18n` — 7개 언어 화면 문구 파일의 키가 모두 같은지 확인.
+
 ## 테스트
 
 ```bash

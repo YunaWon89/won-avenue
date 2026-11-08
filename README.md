@@ -81,6 +81,14 @@ Demo cards (mock mode): `4242 4242 4242 4242` works, `4000 0000 0000 0002` is al
 
 Demo photos are AI-generated for the demo (`server/src/db/demo-images`) and are only attached to dishes they really match (no meat photos on vegetarian dishes). Real restaurants upload their own photos.
 
+## Working with AI coding agents
+
+- `CLAUDE.md` — project notes every Claude Code session reads first (stack, commands, rules).
+- `docs/PRD.md` — product requirements with status marks (done / different from the assignment / open).
+- `.claude/skills/` — step-by-step instructions: `add-api-endpoint`, `add-ui-text` (7 languages), `run-checks`.
+- `.claude/settings.json` — tests, lint and build run without prompts; commit / push ask first; `.env` files are never read.
+- `npm run check:i18n` — checks that all 7 UI translation files have the same keys.
+
 ## Tests
 
 ```bash

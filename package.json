@@ -9,6 +9,7 @@
     "dev:client": "npm run dev --prefix client",
     "db:reset": "npm run db:reset --prefix server",
     "check:translation": "npm run check:translation --prefix server",
+    "check:i18n": "npm run check:i18n --prefix client",
     "test": "npm test --prefix server",
     "build": "npm ci --prefix server --omit=dev && npm ci --prefix client --include=dev && npm run build --prefix client",
     "start": "npm start --prefix server"
