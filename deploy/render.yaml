@@ -1,3 +1,4 @@
+# Render Blueprint (alternative to Vercel). Render reads render.yaml from the repo root: copy this file there to use it.
 # Render Blueprint: one web service (API + built React app) and a PostgreSQL database.
 # Render dashboard -> New -> Blueprint -> select this repository.
 services:

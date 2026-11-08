@@ -1,4 +1,5 @@
 # Single image: builds the React client and serves it from the Express API.
+# Build from the repo root:  docker build -f deploy/Dockerfile -t won-avenue .
 FROM node:22-alpine AS build
 WORKDIR /app
 COPY client/package*.json client/

@@ -40,6 +40,8 @@ Read the relevant PRD section before adding or changing a feature.
 - Never rely on in-memory state or timers surviving between requests. Work after the response → `runInBackground()`
   (`server/src/utils/background.js`, uses Vercel `waitUntil`). Request bodies must stay under 4.5 MB (photos are compressed in the browser).
 - New periodic work → add it to `JOBS` in `jobs.js`, not a `setInterval`.
+- Keep `render.yaml`, `Dockerfile` and `docker-compose.yml` inside `deploy/`: at the repo root Vercel detects them
+  and refuses the single-project setup from `vercel.json`.
 
 ## Client layout
 `pages/` (one file per screen; `admin/`, `manage/`), `components/` (shared UI; `ui.jsx` has inputs, badges, dialogs),

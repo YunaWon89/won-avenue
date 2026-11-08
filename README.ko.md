@@ -46,7 +46,7 @@
 
 ```bash
 # 1. 데이터베이스 (PostgreSQL이 이미 실행 중이면 건너뛰기)
-docker compose up -d
+docker compose -f deploy/docker-compose.yml up -d
 
 # 2. 설치
 npm run install:all
@@ -155,7 +155,7 @@ React 앱은 Vercel CDN에서 정적 파일로 제공되고, Express API는 Verc
 
 같은 코드가 일반 상시 실행 서버로도 동작합니다.
 
-1. Render → **New → Blueprint** → 저장소 선택. `render.yaml`이 웹 서비스와 PostgreSQL을 만듭니다.
+1. `deploy/render.yaml`을 저장소 루트로 복사해 커밋합니다(Render는 루트에서 읽어요. Vercel이 여러 서비스 프로젝트로 오해하지 않도록 `deploy/`에 둡니다). 그다음 Render → **New → Blueprint** → 저장소 선택. 웹 서비스와 PostgreSQL이 만들어집니다.
 2. 첫 배포를 기다린 뒤(데모 데이터 자동 추가) `https://<서비스>.onrender.com`을 엽니다.
 
 무료 플랜 참고: 15분 정도 접속이 없으면 서비스가 잠들고(첫 요청에 30~60초), Render 무료 PostgreSQL은 30일 후 만료됩니다
@@ -164,7 +164,7 @@ React 앱은 Vercel CDN에서 정적 파일로 제공되고, Express API는 Verc
 ### Docker 호스트
 
 ```bash
-docker build -t won-avenue .
+docker build -f deploy/Dockerfile -t won-avenue .
 docker run -p 5000:5000 -e DATABASE_URL=... -e JWT_SECRET=... -e SEED_ON_EMPTY=true won-avenue
 ```
 

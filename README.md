@@ -46,7 +46,7 @@ Requirements: Node.js 20+, PostgreSQL 14+ (or Docker).
 
 ```bash
 # 1. Database (skip if you already have PostgreSQL running)
-docker compose up -d
+docker compose -f deploy/docker-compose.yml up -d
 
 # 2. Install
 npm run install:all
@@ -158,7 +158,7 @@ How the serverless version works (`server/src/bootstrap.js`, `server/src/jobs.js
 
 The same code also runs as a classic long-running server.
 
-1. Render → **New → Blueprint** → pick the repo. `render.yaml` creates the web service and PostgreSQL.
+1. Copy `deploy/render.yaml` to the repo root (Render reads it from there; it is kept in `deploy/` so Vercel doesn't treat the repo as a multi-service project), commit, then Render → **New → Blueprint** → pick the repo. It creates the web service and PostgreSQL.
 2. Wait for the first deploy (demo data is added automatically) and open `https://<service>.onrender.com`.
 
 Free-plan notes: the service sleeps after ~15 minutes idle (first request takes ~30–60 s), and Render's free PostgreSQL expires after 30 days
@@ -167,7 +167,7 @@ Free-plan notes: the service sleeps after ~15 minutes idle (first request takes 
 ### Any Docker host
 
 ```bash
-docker build -t won-avenue .
+docker build -f deploy/Dockerfile -t won-avenue .
 docker run -p 5000:5000 -e DATABASE_URL=... -e JWT_SECRET=... -e SEED_ON_EMPTY=true won-avenue
 ```
 

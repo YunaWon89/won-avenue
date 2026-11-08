@@ -113,5 +113,6 @@ Client: field errors under inputs, toasts for general errors, redirect to login 
   Static React app on Vercel's CDN; the Express API as one Vercel Function (`api/index.js`, region `sin1`, next to the Neon database in Singapore).
   Serverless specifics: database bootstrap on the first request (`server/src/bootstrap.js`), periodic jobs run on requests
   (`server/src/jobs.js`), background work via `waitUntil`, photos compressed in the browser (Vercel request limit 4.5 MB).
-  Render (`render.yaml`) stays as an alternative long-running setup.
+  Render (`deploy/render.yaml`) and Docker (`deploy/Dockerfile`) stay as alternatives; they live in `deploy/` because Vercel
+  reads a root `render.yaml` and then treats the repo as a multi-service project.
 - ✅ Status flow differences (section 5): accepted by the mentor, kept as is.
