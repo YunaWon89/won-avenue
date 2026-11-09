@@ -40,6 +40,9 @@ Read the relevant PRD section before adding or changing a feature.
 - Never rely on in-memory state or timers surviving between requests. Work after the response → `runInBackground()`
   (`server/src/utils/background.js`, uses Vercel `waitUntil`). Request bodies must stay under 4.5 MB (photos are compressed in the browser).
 - New periodic work → add it to `JOBS` in `jobs.js`, not a `setInterval`.
+- Cross-instance locks → `withAdvisoryLock()` (`server/src/utils/advisoryLock.js`, transaction-scoped, bounded wait).
+  Never `pg_advisory_lock` / `pg_advisory_unlock`: through Neon's pooler (transaction mode) the unlock can hit another
+  connection and the lock stays held forever (this once hung every request on Vercel).
 - Keep `render.yaml`, `Dockerfile` and `docker-compose.yml` inside `deploy/`: at the repo root Vercel detects them
   and refuses the single-project setup from `vercel.json`.
 

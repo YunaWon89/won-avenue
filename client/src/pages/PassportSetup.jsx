@@ -33,7 +33,10 @@ export default function PassportSetup() {
   const [consent, setConsent] = useState(false);
 
   const toggle = (key, v) => setDraft((d) => ({ ...d, [key]: d[key].includes(v) ? d[key].filter((x) => x !== v) : [...d[key], v] }));
-  const allergens = showAll ? meta.allergens : COMMON.filter((a) => meta.allergens.includes(a) || !meta.allergens.length);
+  // Full list from the server; if it hasn't arrived (slow network), the same list built into the app.
+  const allAllergens = meta.allergens.length ? meta.allergens : Object.keys(ALLERGEN_ICONS);
+  const allergens = showAll ? allAllergens : COMMON.filter((a) => allAllergens.includes(a));
+  const hiddenCount = allAllergens.length - allergens.length;
   const extraSelected = draft.allergens.filter((a) => !COMMON.includes(a)).length;
 
   const submit = async () => {
@@ -82,8 +85,8 @@ export default function PassportSetup() {
           {allergens.map((a) => (
             <Chip key={a} tone="danger" active={draft.allergens.includes(a)} onClick={() => toggle('allergens', a)}>{ALLERGEN_ICONS[a] || '⚠️'} {t(`allergens.${a}`)}</Chip>
           ))}
-          {!showAll && (
-            <Chip onClick={() => setShowAll(true)}>+{meta.allergens.length - allergens.length}{extraSelected ? ` (${extraSelected})` : ''}</Chip>
+          {!showAll && hiddenCount > 0 && (
+            <Chip onClick={() => setShowAll(true)}>+{hiddenCount}{extraSelected ? ` (${extraSelected})` : ''}</Chip>
           )}
         </div>
       </section>

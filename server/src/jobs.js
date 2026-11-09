@@ -4,18 +4,18 @@
  *  - Serverless (Vercel): there is no process between requests, so runDueJobs() is called on each API
  *    request and runs whatever is due. Order progress is awaited (the response must already show it);
  *    the slower jobs run after the response (runInBackground).
- * Each job takes a PostgreSQL advisory lock, so two instances never run the same job at once.
+ * Each job takes a transaction-scoped advisory lock (utils/advisoryLock.js), so two instances never run the same job at once.
  */
-const { pool } = require('./config/db');
 const { runInBackground } = require('./utils/background');
+const { withAdvisoryLock } = require('./utils/advisoryLock');
 
 const JOBS = [
   {
-    name: 'orders', lock: 52034102, everyMs: 30 * 1000, wait: true,
+    name: 'orders', lock: 73109002, everyMs: 30 * 1000, wait: true,
     run: () => require('./services/orderService').autoProgress(),
   },
   {
-    name: 'translations', lock: 52034103, everyMs: 2 * 60 * 1000, wait: false,
+    name: 'translations', lock: 73109003, everyMs: 2 * 60 * 1000, wait: false,
     enabled: () => require('./services/translationService').isEnabled(),
     run: async () => {
       await require('./services/reviewService').retryPendingReviewTranslations();
@@ -23,21 +23,14 @@ const JOBS = [
     },
   },
   {
-    name: 'dishes', lock: 52034104, everyMs: 10 * 60 * 1000, wait: false,
+    name: 'dishes', lock: 73109004, everyMs: 10 * 60 * 1000, wait: false,
     run: () => require('./services/menuService').hideUnfixedDishes(),
   },
 ];
 
-/** Runs a job unless another instance is running it right now. */
+/** Runs a job unless another instance is running it right now (then it is simply skipped). */
 async function runLocked(job) {
-  const client = await pool.connect();
-  try {
-    const { rows } = await client.query('SELECT pg_try_advisory_lock($1) AS ok', [job.lock]);
-    if (!rows[0].ok) return;
-    try { await job.run(); } finally { await client.query('SELECT pg_advisory_unlock($1)', [job.lock]); }
-  } finally {
-    client.release();
-  }
+  await withAdvisoryLock(job.lock, job.run, { waitMs: 0 });
 }
 
 const lastRun = new Map();

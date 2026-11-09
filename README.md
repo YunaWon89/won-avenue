@@ -147,7 +147,8 @@ Free plans don't expire and don't "sleep" for a minute like Render's free tier.
 
 How the serverless version works (`server/src/bootstrap.js`, `server/src/jobs.js`):
 - Schema is applied when `schema.sql` changes (hash stored in `app_meta`); demo data only into an empty database.
-  A PostgreSQL advisory lock makes this safe when several instances start at once.
+  A transaction-scoped PostgreSQL advisory lock makes this safe when several instances start at once (it also works through
+  Neon's connection pooler and is released if an instance is killed); an interrupted demo data fill is redone on the next start.
 - There is no process between requests, so periodic jobs (auto-complete / auto-cancel orders, translation retries,
   hiding unfixed dishes) run on incoming requests when due, each under its own advisory lock.
 - A new review is translated after the response via `waitUntil`, so the customer never waits for the translation.

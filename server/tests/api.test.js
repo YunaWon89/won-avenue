@@ -975,3 +975,23 @@ describe('Serverless mode (Vercel): jobs on requests, database bootstrap', () =>
     expect((await pool.query('SELECT COUNT(*)::int AS c FROM users')).rows[0].c).toBe(usersBefore);
   });
 });
+
+describe('Bootstrap: interrupted demo data fill', () => {
+  test('a fill that was cut off mid-way is redone on the next start', async () => {
+    await pool.query("INSERT INTO app_meta (key, value) VALUES ('seed_state', 'started') ON CONFLICT (key) DO UPDATE SET value = 'started'");
+    await pool.query("UPDATE restaurants SET name = 'half-filled' WHERE name = '나폴리 피자'"); // pretend the fill stopped half-way
+    const before = process.env.SEED_ON_EMPTY;
+    process.env.SEED_ON_EMPTY = 'true';
+    try {
+      await jest.isolateModulesAsync(async () => {
+        await require('../src/bootstrap').ensureReady({ log: () => {} });
+      });
+    } finally {
+      if (before === undefined) delete process.env.SEED_ON_EMPTY; else process.env.SEED_ON_EMPTY = before;
+    }
+    expect((await pool.query("SELECT value FROM app_meta WHERE key = 'seed_state'")).rows[0].value).toBe('done');
+    expect((await pool.query("SELECT COUNT(*)::int AS c FROM restaurants WHERE name = '나폴리 피자'")).rows[0].c).toBe(1);
+    // advisory locks are transaction-scoped: nothing is left held afterwards
+    expect((await pool.query("SELECT COUNT(*)::int AS c FROM pg_locks WHERE locktype = 'advisory' AND database = (SELECT oid FROM pg_database WHERE datname = current_database())")).rows[0].c).toBe(0);
+  });
+});

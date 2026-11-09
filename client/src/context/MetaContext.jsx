@@ -11,7 +11,13 @@ const MetaContext = createContext(DEFAULT);
 export function MetaProvider({ children }) {
   const [meta, setMeta] = useState(DEFAULT);
   useEffect(() => {
-    api.get('/meta').then((res) => setMeta(res.data)).catch(() => {});
+    // Retry a few times: on a cold start the first request can fail or time out.
+    let cancelled = false;
+    const load = (attempt) => api.get('/meta')
+      .then((res) => { if (!cancelled) setMeta({ ...DEFAULT, ...res.data }); })
+      .catch(() => { if (!cancelled && attempt < 4) setTimeout(() => load(attempt + 1), 1500 * 2 ** attempt); });
+    load(0);
+    return () => { cancelled = true; };
   }, []);
   return <MetaContext.Provider value={meta}>{children}</MetaContext.Provider>;
 }
