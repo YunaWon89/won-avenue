@@ -29,7 +29,6 @@
   --hero-gold: #e2c27e;
   --star: #c4922c;
   --logo-a: #c9a04e; --logo-b: #9a7428; --logo-c: #6e5017; --logo-cut: #faf6ef;
-  --logo-outline: #3b2a14; /* thin dark outline around the logo parts (light theme only) */
 
   --green: #1f8a52;  --green-50: #e8f5ec;
   --blue: #2f6fde;   --blue-50: #eaf1fd;
@@ -81,7 +80,6 @@
   --hero-gold: #e8cc8e;
   --star: #e6c27a;
   --logo-a: #f7e3b1; --logo-b: #d4ab5c; --logo-c: #b38737; --logo-cut: #15110d;
-  --logo-outline: transparent;
   --green: #6fd394; --green-50: #16301f;
   --blue: #7aa7ff; --blue-50: #1c2742;
   --amber: #f0c06a; --amber-50: #3a2d14;
@@ -576,7 +574,7 @@ code { font-size: .85em; background: var(--surface-2); padding: 1px 6px; border-
 .auth-card { width: min(440px, 100%); padding: 32px 28px; display: flex; flex-direction: column; gap: 16px; box-shadow: var(--shadow); }
 .auth-card-wide { width: min(560px, 100%); }
 .auth-card h1 { font-size: 1.5rem; text-align: center; }
-.auth-logo { width: 176px; height: 160px; margin: 0 auto; display: grid; place-items: center; border-radius: 26px; background: var(--hero-bg); box-shadow: var(--card-shadow); --logo-a: #f7e3b1; --logo-b: #d4ab5c; --logo-c: #b38737; --logo-cut: #2a1f16; --logo-outline: transparent; }
+.auth-logo { width: 176px; height: 160px; margin: 0 auto; display: grid; place-items: center; border-radius: 26px; background: var(--hero-bg); box-shadow: var(--card-shadow); --logo-a: #f7e3b1; --logo-b: #d4ab5c; --logo-c: #b38737; --logo-cut: #2a1f16; }
 .auth-card h1 { font-size: 1.75rem; }
 .demo-box { border: 1px dashed var(--border-strong); border-radius: 12px; padding: 10px 14px; font-size: .9rem; }
 .demo-box summary { cursor: pointer; color: var(--muted); font-weight: 600; }
@@ -687,7 +685,7 @@ a.stat:hover { box-shadow: var(--shadow); color: inherit; }
 /* ---- Language picker ---- */
 .welcome { padding-top: 16px; }
 .welcome-hero {
-  position: relative; overflow: hidden; height: 300px; border-radius: 28px; background: var(--hero-bg); color: var(--hero-text); --logo-a: #f7e3b1; --logo-b: #d4ab5c; --logo-c: #b38737; --logo-cut: #2a1f16; --logo-outline: transparent;
+  position: relative; overflow: hidden; height: 300px; border-radius: 28px; background: var(--hero-bg); color: var(--hero-text); --logo-a: #f7e3b1; --logo-b: #d4ab5c; --logo-c: #b38737; --logo-cut: #2a1f16;
   display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 16px 40px rgba(var(--glow-rgb), .28);
 }
 .welcome-hero::before, .welcome-hero::after { content: ''; position: absolute; border-radius: 50%; background: radial-gradient(circle, rgba(226, 194, 126, .14), transparent 70%); }

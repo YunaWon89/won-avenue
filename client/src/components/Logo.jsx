@@ -98,21 +98,12 @@ export function LogoFull({ width, height, signature }) {
     <svg width={w} height={(w * 186) / 240} viewBox="0 0 240 186" role="img" aria-label="WON AVENUE" className="logo-full">
       <defs>
         <Gradient id={id} />
-        {/* Thin even outline around every part (colour from --logo-outline; transparent in the dark theme). */}
-        <filter id={`o${id}`} x="-4%" y="-4%" width="108%" height="108%">
-          <feMorphology in="SourceAlpha" operator="dilate" radius="1.1" result="thick" />
-          <feFlood style={{ floodColor: 'var(--logo-outline, transparent)' }} result="ink" />
-          <feComposite in="ink" in2="thick" operator="in" result="outline" />
-          <feMerge><feMergeNode in="outline" /><feMergeNode in="SourceGraphic" /></feMerge>
-        </filter>
       </defs>
-      <g filter={`url(#o${id})`}>
       <g transform="translate(75.4 2) scale(.48)"><EmblemShapes g={g} signature={showSig} /></g>
       <g transform="translate(122.5 132) scale(1.98)"><path d={AVENUE_PATH} fill={g} /></g>
       <line x1="22" y1="162" x2="94" y2="162" stroke={g} strokeWidth="1.8" strokeLinecap="round" />
       <Mugunghwa g={g} x={120} y={162} scale={0.62} />
       <line x1="146" y1="162" x2="218" y2="162" stroke={g} strokeWidth="1.8" strokeLinecap="round" />
-      </g>
     </svg>
   );
 }
