@@ -43,6 +43,8 @@ Read the relevant PRD section before adding or changing a feature.
 - Cross-instance locks → `withAdvisoryLock()` (`server/src/utils/advisoryLock.js`, transaction-scoped, bounded wait).
   Never `pg_advisory_lock` / `pg_advisory_unlock`: through Neon's pooler (transaction mode) the unlock can hit another
   connection and the lock stays held forever (this once hung every request on Vercel).
+  Lock holders use a separate connection pool (`getLockPool()` in `config/db.js`); never hold a connection from the main
+  pool while waiting for work that needs another one — with few connections per instance that deadlocks.
 - Keep `render.yaml`, `Dockerfile` and `docker-compose.yml` inside `deploy/`: at the repo root Vercel detects them
   and refuses the single-project setup from `vercel.json`.
 

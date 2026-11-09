@@ -1,6 +1,6 @@
 const request = require('supertest');
 const app = require('../src/app');
-const { pool } = require('../src/config/db');
+const { pool, closeAll } = require('../src/config/db');
 const { seed, PASSWORD } = require('../src/db/seed');
 
 /** Logged-in supertest agent (cookie-based session). */
@@ -35,7 +35,7 @@ beforeAll(async () => {
   card = cards.body.data.find((c) => c.isDefault);
 });
 
-afterAll(() => pool.end());
+afterAll(() => closeAll());
 
 const menuOf = async (restaurant, query = '') => (await request(app).get(`/api/restaurants/${restaurant.id}/menu-items${query}`)).body.items;
 
@@ -968,7 +968,11 @@ describe('Serverless mode (Vercel): jobs on requests, database bootstrap', () =>
     const usersBefore = (await pool.query('SELECT COUNT(*)::int AS c FROM users')).rows[0].c;
     await pool.query("DELETE FROM app_meta WHERE key = 'schema_hash'").catch(() => {});
     await jest.isolateModulesAsync(async () => {
-      await require('../src/bootstrap').ensureReady({ log: () => {} });
+      try {
+        await require('../src/bootstrap').ensureReady({ log: () => {} });
+      } finally {
+        await require('../src/config/db').closeAll(); // this isolated copy has its own connections
+      }
     });
     const meta = await pool.query("SELECT value FROM app_meta WHERE key = 'schema_hash'");
     expect(meta.rows[0].value).toMatch(/^[0-9a-f]{64}$/);
@@ -984,7 +988,11 @@ describe('Bootstrap: interrupted demo data fill', () => {
     process.env.SEED_ON_EMPTY = 'true';
     try {
       await jest.isolateModulesAsync(async () => {
-        await require('../src/bootstrap').ensureReady({ log: () => {} });
+        try {
+          await require('../src/bootstrap').ensureReady({ log: () => {} });
+        } finally {
+          await require('../src/config/db').closeAll(); // this isolated copy has its own connections
+        }
       });
     } finally {
       if (before === undefined) delete process.env.SEED_ON_EMPTY; else process.env.SEED_ON_EMPTY = before;

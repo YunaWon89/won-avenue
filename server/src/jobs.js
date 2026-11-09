@@ -35,16 +35,24 @@ async function runLocked(job) {
 
 const lastRun = new Map();
 
-/** Serverless: run the jobs that are due. Never throws (a failed job must not break the request). */
+let backgroundChain = Promise.resolve();
+
+/**
+ * Serverless: run the jobs that are due. Never throws (a failed job must not break the request).
+ * Background jobs run one after another (a single chain), never all at once.
+ */
 async function runDueJobs(now = Date.now()) {
   const waits = [];
   for (const job of JOBS) {
     if (job.enabled && !job.enabled()) continue;
     if (now - (lastRun.get(job.name) || 0) < job.everyMs) continue;
     lastRun.set(job.name, now);
-    const work = () => runLocked(job);
-    if (job.wait) waits.push(work().catch((err) => console.warn(`[jobs] ${job.name} failed: ${err.message}`)));
-    else runInBackground(work, `jobs:${job.name}`);
+    if (job.wait) {
+      waits.push(runLocked(job).catch((err) => console.warn(`[jobs] ${job.name} failed: ${err.message}`)));
+    } else {
+      backgroundChain = backgroundChain.then(() => runLocked(job)).catch((err) => console.warn(`[jobs] ${job.name} failed: ${err.message}`));
+      runInBackground(backgroundChain, `jobs:${job.name}`);
+    }
   }
   await Promise.all(waits);
 }

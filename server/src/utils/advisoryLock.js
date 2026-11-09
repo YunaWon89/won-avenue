@@ -1,4 +1,4 @@
-const { pool } = require('../config/db');
+const { getLockPool } = require('../config/db');
 
 const sleep = (ms) => new Promise((r) => { setTimeout(r, ms); });
 
@@ -14,7 +14,7 @@ const sleep = (ms) => new Promise((r) => { setTimeout(r, ms); });
  * @returns {Promise<{locked: boolean, value?: any}>}
  */
 async function withAdvisoryLock(lockId, fn, { waitMs = 0, pollMs = 500 } = {}) {
-  const client = await pool.connect();
+  const client = await getLockPool().connect(); // separate pool: see config/db.js
   let open = false;
   try {
     await client.query('BEGIN');
